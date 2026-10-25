@@ -6,7 +6,7 @@ export SDL2_SOURCE="$(bash "$project_dir/prepare-sdl.sh")"
 cd "$project_dir"
 if [[ -n "${NOVII_SESSION:-}${NOVII_ZIP:-}" ]]; then
     if [[ -n "${NOVII_SESSION:-}" ]]; then
-        cp "$NOVII_SESSION" app/src/novii/assets/session.img
+        cp "$NOVII_SESSION" noviiremote/src/main/assets/session.img
     else
         # Optional first-time ROM/database preparation on the host. The APK
         # itself contains only native ARM64 code and SDL2.
@@ -18,11 +18,11 @@ if [[ -n "${NOVII_SESSION:-}${NOVII_ZIP:-}" ]]; then
         make -C "$CLOUDPILOT_SOURCE/src/uarm" -j8 uarm_web.wasm
         python3 tools/prepare-novii.py --e2 "$NOVII_ZIP" build/novii-e2-databases
         node tools/install-novii-e2.cjs "$CLOUDPILOT_SOURCE" "$E2_NOR" "$E2_NAND" \
-            build/novii-e2-databases app/src/novii/assets/session.img
+            build/novii-e2-databases noviiremote/src/main/assets/session.img
     fi
-    ./gradlew assembleNovii
+    ./gradlew :noviiremote:assembleDebug
 else
     : "${PALM_IMAGE:?Set PALM_IMAGE to your own m130 session with OmniRemote installed}"
-    cp "$PALM_IMAGE" app/src/debug/assets/session.img
-    ./gradlew assembleDebug
+    cp "$PALM_IMAGE" omniremote/src/main/assets/session.img
+    ./gradlew :omniremote:assembleDebug
 fi

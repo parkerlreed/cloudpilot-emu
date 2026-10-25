@@ -1,0 +1,5 @@
+plugins { id 'com.android.application' }
+ext.remoteNamespace = 'local.omniremote'
+ext.remoteApplicationId = 'local.omniremote.irtest'
+ext.remoteBackend = 'omni'
+apply from: rootProject.file('runtime/android-app.gradle')

@@ -1,7 +1,7 @@
 .gradle/
 build/
-app/build/
-app/.cxx/
+**/build/
+**/.cxx/
 local.properties
-app/src/debug/assets/session.img
-app/src/novii/assets/session.img
+omniremote/src/main/assets/session.img
+noviiremote/src/main/assets/session.img

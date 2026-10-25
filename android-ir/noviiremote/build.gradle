@@ -1,0 +1,5 @@
+plugins { id 'com.android.application' }
+ext.remoteNamespace = 'local.noviiremote'
+ext.remoteApplicationId = 'local.noviiremote.irtest'
+ext.remoteBackend = 'novii'
+apply from: rootProject.file('runtime/android-app.gradle')

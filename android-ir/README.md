@@ -4,13 +4,22 @@ Two standalone ARM64 Android apps run Cloudpilot directly as native C++ with
 SDL2 rendering, touch, Graffiti and hardware buttons. Both use the native
 Android USB receiver/transmitter. No WebView or WASM runtime is packaged.
 
-| Build | Android package | Palm backend | Saved file |
+| Application module | Android package | Palm backend | Saved file |
 | --- | --- | --- | --- |
-| OmniRemote IR Test (`debug`) | `local.omniremote.irtest` | m130 / OS 4 / 68k | `session.img` |
-| NoviiRemote IR Test (`novii`) | `local.omniremote.irtest.novii` | Tungsten E2 / OS 5 / ARM | `session-e2.img` |
+| `omniremote` | `local.omniremote.irtest` | m130 / OS 4 / 68k | `session.img` |
+| `noviiremote` | `local.noviiremote.irtest` | Tungsten E2 / OS 5 / ARM | `session-e2.img` |
 
-Existing saved sessions survive the transition from the web frontend and APK
-updates. Novii's older m130 session remains in its separate `session.img`.
+These are independent Android application modules, with their own manifests,
+launcher activities, package IDs and assets. Shared SDL/USB code is in the
+neutral `runtime/` directory and Java package `local.palmir`; neither app is a
+build variant of the other. Log tags are `OmniRemote` and `NoviiRemote`, with
+shared USB protocol diagnostics under `PalmUsbIR`.
+
+OmniRemote retains its existing package ID and saved session. Novii formerly
+used `local.omniremote.irtest.novii`; an existing installation of that legacy
+package needs its `files/session-e2.img` copied into the new Novii package before
+removing the old app. Back up `files/session.img` too if its earlier m130 session
+is still needed. Android isolates private data between package IDs.
 The supplied session asset is used only when the app has no saved session.
 Back cancels an active capture and saves before closing. Backgrounding also
 saves. A failed save keeps the app open. Android's status bar is hidden, all
@@ -43,16 +52,16 @@ OmniRemote, using an existing m130 session with the app installed:
 
 ```sh
 JAVA_HOME=/path/to/jdk21 PALM_IMAGE=/path/to/omniremote-session.img ./build.sh
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n local.omniremote.irtest/local.omniremote.NativeActivity
+adb install -r omniremote/build/outputs/apk/debug/omniremote-debug.apk
+adb shell am start -n local.omniremote.irtest/local.omniremote.OmniRemoteActivity
 ```
 
 Novii, using a prepared E2 session:
 
 ```sh
 JAVA_HOME=/path/to/jdk21 NOVII_SESSION=/path/to/novii-e2-session.img ./build.sh
-adb install -r app/build/outputs/apk/novii/app-novii.apk
-adb shell am start -n local.omniremote.irtest.novii/local.omniremote.NativeActivity
+adb install -r noviiremote/build/outputs/apk/debug/noviiremote-debug.apk
+adb shell am start -n local.noviiremote.irtest/local.noviiremote.NoviiRemoteActivity
 ```
 
 Native APK builds from prepared sessions do not require Emscripten, Node or
@@ -115,4 +124,17 @@ The short-click PWM regression test runs without a ROM or Android device:
 ```sh
 c++ -std=c++17 -O2 test/pwm-audio.cpp -o /tmp/test-pwm-audio
 /tmp/test-pwm-audio
+```
+
+Launcher icons use each application's original color `tAIB` 1000 resource
+from its user-supplied PRC, including Palm transparency. Novii uses its 64×44
+high-density icon; OmniRemote uses its 32×32 color icon. The Android adaptive
+icons preserve the original artwork with nearest-neighbor scaling, center
+the visible artwork after trimming transparent Palm padding, and use
+transparent backgrounds. Regenerate
+them locally with Pillow:
+
+```sh
+python3 tools/extract-prc-icons.py --omni /path/to/Remote.prc \
+  --novii /path/to/NoviiRemote.zip
 ```
