@@ -8,10 +8,13 @@
 #include "Debugger.h"
 #include "GdbStub.h"
 
+struct SDL_Renderer;
+
 namespace commands {
     struct Context {
         Debugger& debugger;
         GdbStub& gdbStub;
+        SDL_Renderer* renderer;
     };
 
     void Register();

@@ -164,6 +164,11 @@ and from [PalmDB](https://palmdb.net/app/palm-roms-complete).
 
 # Native app
 
+The standalone [Android SDL2 IR apps](android-ir/README.md) run OmniRemote on
+the m130 core and NoviiRemote on the Tungsten E2 core, with native Android USB
+learning and transmission. They build directly from this checkout without
+Tauri or a web frontend.
+
 ## OS4 and earlier
 
 In addition to the web version, CloudpilotEmu can be built as a native app.

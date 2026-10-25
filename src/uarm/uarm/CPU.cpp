@@ -20,6 +20,7 @@
 #include "memcpy.h"
 #include "pace.h"
 #include "patch68k.h"
+#include "novii_ir.h"
 #include "patch_dispatch.h"
 #include "peephole.h"
 #include "savestate/savestateAll.h"
@@ -3308,7 +3309,10 @@ static void cpuPrvPaceSyscall(struct ArmCpu *cpu) {
         return;
     }
 
-    if (patch68kHandle(trapWord)) return;
+    if (patch68kHandle(trapWord)) {
+        if (noviiIrPending()) cpuSetSlowPath(cpu, SLOW_PATH_REASON_RESCHEDULE);
+        return;
+    }
 
     cpuPrvPaceSyscall(cpu, trapWord);
 

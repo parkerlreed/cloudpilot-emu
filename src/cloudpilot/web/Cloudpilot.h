@@ -27,6 +27,14 @@ class Cloudpilot {
     int GetCyclesPerSecond();
     int RunEmulation(int cycles);
     void SetClockFactor(double clockFactor);
+    void SetIrBridgeEnabled(bool enabled);
+    bool IsIrLearnPending();
+    int GetIrLearnRate();
+    bool CompleteIrLearn(void* timings, int count);
+    int GetIrTransmitSize();
+    int GetIrTransmitFrequency();
+    void* GetIrTransmitData();
+    void PopIrTransmit();
 
     Frame& CopyFrame();
     bool IsScreenDirty();

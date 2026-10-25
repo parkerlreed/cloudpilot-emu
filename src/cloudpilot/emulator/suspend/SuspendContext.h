@@ -14,7 +14,8 @@ class SuspendContext {
         clipboardPaste = 2,
         networkRpc = 3,
         networkConnect = 4,
-        serialSync = 5
+        serialSync = 5,
+        irLearn = 6
     };
 
    public:

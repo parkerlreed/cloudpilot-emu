@@ -13,6 +13,7 @@
 #include "EmSession.h"
 #include "EmSystemState.h"
 #include "ExternalStorage.h"
+#include "PatchModuleOmniRemote.h"
 #include "Feature.h"
 #include "LogDomain.h"
 #include "Logging.h"
@@ -168,6 +169,17 @@ int Cloudpilot::TotalMemoryForDevice(string id) {
 void Cloudpilot::QueuePenMove(int x, int y) { gSession->QueuePenEvent(PenEvent::down(x, y)); }
 
 void Cloudpilot::QueuePenUp() { gSession->QueuePenEvent(PenEvent::up()); }
+
+void Cloudpilot::SetIrBridgeEnabled(bool enabled) { PatchModuleOmniRemote::enabled = enabled; }
+bool Cloudpilot::IsIrLearnPending() { return PatchModuleOmniRemote::IsPending(); }
+int Cloudpilot::GetIrLearnRate() { return PatchModuleOmniRemote::GetRate(); }
+bool Cloudpilot::CompleteIrLearn(void* timings, int count) {
+    return count > 0 && PatchModuleOmniRemote::Complete(static_cast<const uint32*>(timings), count);
+}
+int Cloudpilot::GetIrTransmitSize() { return PatchModuleOmniRemote::TransmitSize(); }
+int Cloudpilot::GetIrTransmitFrequency() { return PatchModuleOmniRemote::TransmitFrequency(); }
+void* Cloudpilot::GetIrTransmitData() { return PatchModuleOmniRemote::TransmitData(); }
+void Cloudpilot::PopIrTransmit() { PatchModuleOmniRemote::PopTransmit(); }
 
 void Cloudpilot::QueueButtonDown(int id) {
     gSession->QueueButtonEvent(ButtonEvent(buttonFromId(id), ButtonEvent::Type::press));

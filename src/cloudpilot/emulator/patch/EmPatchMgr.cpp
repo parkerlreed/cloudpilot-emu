@@ -28,6 +28,7 @@
 #include "Miscellaneous.h"
 #include "PatchModuleClieStubAll.h"
 #include "PatchModuleNetlib.h"
+#include "PatchModuleOmniRemote.h"
 #include "PenEvent.h"
 #include "ROMStubs.h"  // FtrSet, FtrUnregister, EvtWakeup, ...
 #include "UAE.h"       // gRegs, m68k_dreg, etc.
@@ -301,6 +302,9 @@ EmPatchModule* EmPatchMgr::GetLibPatchTable(uint16 refNum) {
 
         if (libName == string(PatchModuleNetlib::LIBNAME)) {
             patchModuleIP = patchModuleNetlib;
+        } else if (libName == "ORLib.prc") {
+            static PatchModuleOmniRemote omniRemote;
+            patchModuleIP = &omniRemote;
         } else if (gSession->GetDevice().IsClie() &&
                    PatchModuleClieStubAll::HandlesLibrary(libName)) {
             patchModuleIP = patchModuleClieStubAll;
@@ -332,6 +336,9 @@ CallROMType EmPatchMgr::HandleSystemCall(const SystemCallContext& context) {
     HeadpatchProc hp;
     TailpatchProc tp;
     EmPatchMgr::GetPatches(context, hp, tp);
+    if (auto novii = PatchModuleOmniRemote::NoviiHeadpatch(context.fTrapWord)) {
+        hp = novii; tp = nullptr;
+    }
 
 #ifdef LOG_SYSCALLS
     cerr << "syscall: " << trapWordToString(context.fTrapWord) << endl << flush;

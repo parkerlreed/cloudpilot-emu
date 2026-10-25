@@ -11,6 +11,16 @@ interface Uarm {
 
     boolean Launch(long romSize, VoidPtr romData);
 
+    void SetIrBridgeEnabled(boolean enabled);
+    boolean IsIrLearnPending();
+    boolean CompleteIrLearn(VoidPtr timings, long count);
+    void CancelIrLearn();
+    long GetIrTransmitSize();
+    long GetIrTransmitFrequency();
+    VoidPtr GetIrTransmitData();
+    void PopIrTransmit();
+
+    void RunCycles(long cycles);
     double Cycle(unsigned long long now);
 
     VoidPtr GetFrame();

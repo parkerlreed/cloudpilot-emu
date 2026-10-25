@@ -55,6 +55,7 @@ SOURCE_C = \
 	proto/networking.pb.c
 
 SOURCE_CXX = \
+    emulator/patch/PatchModuleOmniRemote.cpp \
 	emulator/uae/readcpu.cpp \
 	emulator/hardware/EmMemory.cpp \
 	emulator/hardware/EmHAL.cpp \

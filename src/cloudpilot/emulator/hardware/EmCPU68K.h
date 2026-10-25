@@ -227,6 +227,7 @@ class EmCPU68K : public EmCPU {
 
     virtual uint32 Execute(uint32 maxCycles);
     virtual void CheckAfterCycle(void);
+    uint32 GetCurrentCycles() const { return fCurrentCycles; }
 
     // Low-level access to CPU state.
 

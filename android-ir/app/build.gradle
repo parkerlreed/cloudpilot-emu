@@ -1,0 +1,33 @@
+plugins { id 'com.android.application' }
+def corePath = System.getenv('CLOUDPILOT_SOURCE') ?: rootDir.parentFile.absolutePath
+def sdlPath = System.getenv('SDL2_SOURCE') ?: new File(rootDir, 'build/SDL2').absolutePath
+android {
+    namespace 'local.omniremote'
+    compileSdk 36
+    ndkVersion '29.0.14206865'
+    defaultConfig {
+        applicationId 'local.omniremote.irtest'
+        minSdk 26; targetSdk 35; versionCode 1; versionName '0.1'
+        manifestPlaceholders = [appLabel: 'OmniRemote IR Test', remoteActivity: 'local.omniremote.NativeActivity']
+        ndk { abiFilters 'arm64-v8a' }
+        externalNativeBuild { cmake { arguments "-DCLOUDPILOT_SOURCE=${corePath}", "-DSDL2_SOURCE=${sdlPath}" } }
+    }
+    buildTypes {
+        debug { externalNativeBuild { cmake { arguments '-DREMOTE_APP=omni'; targets 'omni' } } }
+        novii {
+            initWith debug
+            applicationIdSuffix '.novii'
+            matchingFallbacks = ['debug']
+            manifestPlaceholders = [appLabel: 'NoviiRemote IR Test', remoteActivity: 'local.omniremote.NativeActivity']
+            externalNativeBuild { cmake { arguments.clear(); arguments '-DREMOTE_APP=novii'; targets.clear(); targets 'novii' } }
+        }
+    }
+    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
+    sourceSets {
+        main.assets.srcDirs = []
+        main.java.srcDir "${sdlPath}/android-project/app/src/main/java"
+        debug.assets.srcDirs = ['src/debug/assets']
+    }
+    packaging { jniLibs { useLegacyPackaging true } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

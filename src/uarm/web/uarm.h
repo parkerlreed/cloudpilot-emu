@@ -30,6 +30,15 @@ class Uarm {
 
     bool Launch(unsigned int romSize, void* romData);
 
+    void SetIrBridgeEnabled(bool enabled);
+    bool IsIrLearnPending();
+    bool CompleteIrLearn(void* timings, unsigned count);
+    void CancelIrLearn();
+    unsigned GetIrTransmitSize();
+    unsigned GetIrTransmitFrequency();
+    void* GetIrTransmitData();
+    void PopIrTransmit();
+    void RunCycles(unsigned cycles);
     double Cycle(uint64_t now);
 
     void* GetFrame();

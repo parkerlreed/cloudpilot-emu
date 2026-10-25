@@ -217,7 +217,7 @@ void run(const Options& options) {
 
     commands::Register();
     cli::Start(options.scriptFile);
-    commands::Context commandContext = {.debugger = gDebugger, .gdbStub = gdbStub};
+    commands::Context commandContext = {.debugger = gDebugger, .gdbStub = gdbStub, .renderer = renderer};
 
     while (mainLoop->IsRunning()) {
         if (gSession->GetDevice().GetScreenDimensions() != screenDimensionsKind) {
@@ -229,6 +229,7 @@ void run(const Options& options) {
 
         mainLoop->Cycle();
 
+        commandContext.renderer = renderer;
         if (cli::Execute(&commandContext)) break;
 
         handleSuspend();

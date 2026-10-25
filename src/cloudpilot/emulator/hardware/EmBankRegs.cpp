@@ -13,14 +13,42 @@
 
 #include "EmBankRegs.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 #include "EmCPU.h"     // GetPC
 #include "EmCPU68K.h"  // gCPU68K
 #include "EmCommon.h"
 #include "EmMemory.h"   // gMemAccessFlags, EmMemory::IsPCInRAM
 #include "EmSession.h"  // GetDevice, ScheduleDeferredError
+#include "PatchModuleOmniRemote.h"
 #include "savestate/Savestate.h"
 #include "savestate/SavestateLoader.h"
 #include "savestate/SavestateProbe.h"
+
+namespace {
+    void TraceIrRegister(emuptr address, unsigned size, uint32 value) {
+        if (PatchModuleOmniRemote::enabled) PatchModuleOmniRemote::RegisterWrite(address, size, value);
+#ifndef __EMSCRIPTEN__
+        // Opt-in diagnostics for applications that bit-bang the IR transmitter.
+        // Byte-oriented serial redirection loses these register transitions.
+        if (!((address >= 0xfffff400 && address < 0xfffff450) ||
+              (address >= 0xfffff900 && address < 0xfffff920))) return;
+        static FILE* output = []() -> FILE* {
+            const char* path = std::getenv("CPE_IR_TRACE");
+            return path && *path ? std::fopen(path, "w") : nullptr;
+        }();
+        if (!output || !gSession || !gCPU68K) return;
+        const uint64 cycles = gSession->GetSystemCycles() + gCPU68K->GetCurrentCycles();
+        std::fprintf(output,
+                     "{\"cycles\":%llu,\"clock_hz\":%u,\"pc\":\"%08x\","
+                     "\"address\":\"%08x\",\"size\":%u,\"value\":%u}\n",
+                     static_cast<unsigned long long>(cycles), gSession->GetClocksPerSecond(),
+                     gCPU68K->GetPC(), address, size, value);
+        std::fflush(output);
+#endif
+    }
+}
 
 /*
         When emulating memory, UAE divides up the 4GB address space into
@@ -286,6 +314,7 @@ uint32 EmBankRegs::GetByte(emuptr address) {
 // ---------------------------------------------------------------------------
 
 void EmBankRegs::SetLong(emuptr address, uint32 value) {
+    TraceIrRegister(address, 4, value);
     EmRegs* bank = EmBankRegs::GetSubBank(address, sizeof(uint32));
 
     if (bank) {
@@ -309,6 +338,7 @@ void EmBankRegs::SetLong(emuptr address, uint32 value) {
 // ---------------------------------------------------------------------------
 
 void EmBankRegs::SetWord(emuptr address, uint32 value) {
+    TraceIrRegister(address, 2, value);
     EmRegs* bank = EmBankRegs::GetSubBank(address, sizeof(uint16));
 
     if (bank) {
@@ -332,6 +362,7 @@ void EmBankRegs::SetWord(emuptr address, uint32 value) {
 // ---------------------------------------------------------------------------
 
 void EmBankRegs::SetByte(emuptr address, uint32 value) {
+    TraceIrRegister(address, 1, value);
     EmRegs* bank = EmBankRegs::GetSubBank(address, sizeof(uint8));
 
     if (bank) {

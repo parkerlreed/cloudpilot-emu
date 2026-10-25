@@ -5,6 +5,8 @@
 #include <iomanip>
 #include <sstream>
 #include <unordered_map>
+#include <SDL.h>
+#include <SDL_image.h>
 
 #include "Cli.h"
 #include "DbBackup.h"
@@ -14,11 +16,13 @@
 #include "EmBankSRAM.h"
 #include "EmCommon.h"
 #include "EmErrCodes.h"
+#include "EmDevice.h"
 #include "EmHAL.h"
 #include "EmMemory.h"
 #include "EmSession.h"
 #include "ExternalStorage.h"
 #include "SessionImage.h"
+#include "ScreenDimensions.h"
 #include "StackDump.h"
 #include "ZipfileWalker.h"
 #include "md5.h"
@@ -27,6 +31,53 @@
 using namespace std;
 
 namespace {
+    void CmdScreenshot(vector<string> args, cli::CommandEnvironment& env, void* context) {
+        if (args.size() != 1) return env.PrintUsage();
+        SDL_Renderer* renderer = static_cast<commands::Context*>(context)->renderer;
+        int width, height;
+        if (SDL_GetRendererOutputSize(renderer, &width, &height) != 0) {
+            cout << "screenshot failed: " << SDL_GetError() << endl;
+            return;
+        }
+        unique_ptr<SDL_Surface, decltype(&SDL_FreeSurface)> surface(
+            SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_ABGR8888),
+            SDL_FreeSurface);
+        if (!surface || SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ABGR8888,
+                                            surface->pixels, surface->pitch) != 0 ||
+            IMG_SavePNG(surface.get(), args[0].c_str()) != 0) {
+            cout << "screenshot failed: " << SDL_GetError() << endl;
+            return;
+        }
+        cout << "screenshot saved: " << args[0] << endl;
+    }
+
+    void CmdPen(vector<string> args, cli::CommandEnvironment& env, void* context) {
+        if (args.size() == 1 && args[0] == "up") {
+            gSession->QueuePenEvent(PenEvent::up());
+            return;
+        }
+        if (args.size() != 3 || args[0] != "down") return env.PrintUsage();
+        try {
+            size_t usedX, usedY;
+            int x = stoi(args[1], &usedX), y = stoi(args[2], &usedY);
+            ScreenDimensions dimensions(gSession->GetDevice().GetScreenDimensions());
+            if (usedX != args[1].size() || usedY != args[2].size() || x < 0 || y < 0 ||
+                x >= dimensions.Width() || y >= dimensions.Height() + dimensions.SilkscreenHeight())
+                return env.PrintUsage();
+            gSession->QueuePenEvent(PenEvent::down(x, y));
+        } catch (const exception&) { env.PrintUsage(); }
+    }
+
+    void CmdKey(vector<string> args, cli::CommandEnvironment& env, void* context) {
+        if (args.size() != 1) return env.PrintUsage();
+        try {
+            size_t used;
+            unsigned long value = stoul(args[0], &used, 0);
+            if (used != args[0].size() || value > 65535) return env.PrintUsage();
+            gSession->QueueKeyboardEvent(KeyboardEvent(static_cast<uint16>(value)));
+        } catch (const exception&) { env.PrintUsage(); }
+    }
+
     string translateInstallResult(DbInstaller::Result result) {
         switch (result) {
             case DbInstaller::Result::success:
@@ -488,6 +539,12 @@ namespace {
     }
 
     const vector<cli::Command> commandList({
+        {.name = "screenshot", .usage = "screenshot <png_file>",
+         .description = "Save the displayed emulator window as PNG.", .cmd = CmdScreenshot},
+        {.name = "pen", .usage = "pen down <x> <y> | pen up",
+         .description = "Queue pen input in Palm screen coordinates.", .cmd = CmdPen},
+        {.name = "key", .usage = "key <character_code>",
+         .description = "Queue a Palm keyboard character (decimal or 0x hex).", .cmd = CmdKey},
         {
             .name = "install",
             .usage = "install <file> [file...]",

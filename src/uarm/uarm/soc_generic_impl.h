@@ -3,6 +3,7 @@
 
 // clang-format off
 #include "soc_generic.h"
+#include "novii_ir.h"
 // clang-format on
 
 #include "CPU.h"
@@ -172,6 +173,7 @@ uint64_t SocGeneric<T>::RunUntil(uint64_t maxCycles, uint64_t cyclesPerSecond) {
     uint64_t cycles = 0;
 
     while (cycles < maxCycles) {
+        if (noviiIrPending()) break;
         uint64_t cyclesToAdvance = scheduler->CyclesToNextUpdate(cyclesPerSecond);
 
         if (cyclesToAdvance + cycles > maxCycles) cyclesToAdvance = maxCycles - cycles;

@@ -60,6 +60,7 @@ SOURCE_CXX =		 					\
 	uarm/pv_sysctl.cpp					\
 	uarm/pv_storage.cpp					\
 	uarm/device_configuration.cpp 		\
+	uarm/novii_ir.cpp \
 	uarm/patch68k.cpp 					\
 	uarm/peephole.cpp					\
 	uarm/pace_patch.cpp					\

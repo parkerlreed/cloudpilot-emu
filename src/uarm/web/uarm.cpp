@@ -1,4 +1,5 @@
 #include "uarm.h"
+#include "novii_ir.h"
 
 #include <cstring>
 #include <iostream>
@@ -299,3 +300,14 @@ bool Uarm::LaunchAppByDbHeader(void* header, int len) {
 
     return launchAppByName(soc->GetSyscallDispatch(), static_cast<const char*>(header));
 }
+
+void Uarm::SetIrBridgeEnabled(bool enabled) { noviiIrEnable(enabled); }
+bool Uarm::IsIrLearnPending() { return noviiIrPending(); }
+bool Uarm::CompleteIrLearn(void* timings, unsigned count) { return noviiIrComplete(static_cast<const uint32_t*>(timings), count); }
+void Uarm::CancelIrLearn() { noviiIrCancel(); }
+unsigned Uarm::GetIrTransmitSize() { return noviiIrTransmitSize(); }
+unsigned Uarm::GetIrTransmitFrequency() { return noviiIrTransmitFrequency(); }
+void* Uarm::GetIrTransmitData() { return noviiIrTransmitData(); }
+void Uarm::PopIrTransmit() { noviiIrPopTransmit(); }
+
+void Uarm::RunCycles(unsigned cycles) { soc->Run(cycles, 100000000); }
