@@ -33,6 +33,7 @@ public:
  void GetAudio(std::vector<uint32_t>& samples);
 #ifdef OMNI_REMOTE
  static constexpr unsigned Width=160;
+ static constexpr unsigned Height=160;
 private:
  SessionImage source;
  Cloudpilot cp;
@@ -42,6 +43,11 @@ private:
  std::vector<uint8_t> frame;
 #else
  static constexpr unsigned Width=320;
+#ifdef NOVII_PV
+ static constexpr unsigned Height=480;
+#else
+ static constexpr unsigned Height=320;
+#endif
 private:
  SessionFile5 source;
  Uarm cp;

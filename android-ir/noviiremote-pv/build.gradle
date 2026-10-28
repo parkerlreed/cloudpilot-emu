@@ -1,0 +1,29 @@
+plugins { id 'com.android.application' }
+ext.remoteNamespace = 'local.noviiremote.pv'
+ext.remoteApplicationId = 'local.noviiremote.pv.irtest'
+ext.remoteBackend = 'novii_pv'
+apply from: rootProject.file('runtime/android-app.gradle')
+android.sourceSets.main.res.srcDirs += [rootProject.file('noviiremote/src/main/res')]
+
+def signingFile = rootProject.file('release-signing.properties')
+def releaseSigning = new Properties()
+if (signingFile.exists()) signingFile.withInputStream { releaseSigning.load(it) }
+android {
+    defaultConfig { versionCode 2; versionName '1.0.0' }
+    if (signingFile.exists()) {
+        signingConfigs {
+            pvRelease {
+                storeFile rootProject.file(releaseSigning.getProperty('storeFile'))
+                storePassword rootProject.file(releaseSigning.getProperty('storePasswordFile')).text.trim()
+                keyAlias releaseSigning.getProperty('keyAlias')
+                keyPassword rootProject.file(releaseSigning.getProperty('keyPasswordFile')).text.trim()
+            }
+        }
+        buildTypes.release.signingConfig signingConfigs.pvRelease
+    }
+}
+tasks.configureEach {
+    if (name == 'preReleaseBuild') doFirst {
+        if (!signingFile.exists()) throw new GradleException('PV release requires release-signing.properties; see README.md')
+    }
+}

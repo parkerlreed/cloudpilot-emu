@@ -63,14 +63,21 @@ void* RemoteBackend::GetFrame(){
 void RemoteBackend::ResetFrame(){cp.MarkScreenClean();}
 #else
 bool RemoteBackend::Restore(const std::vector<uint8_t>& data){
- if(!source.Deserialize(data.size(),data.data())||source.GetDeviceType()!=0||source.GetDisplayMode()!=5)return false;
- cp.SetRamSize(source.GetRamSize()).SetDisplayMode(5).SetNand(source.GetNandSize(),const_cast<void*>(source.GetNand()));
+#ifdef NOVII_PV
+ constexpr int expectedDevice=2;
+ constexpr unsigned displayMode=6;
+#else
+ constexpr int expectedDevice=0;
+ constexpr unsigned displayMode=5;
+#endif
+ if(!source.Deserialize(data.size(),data.data())||source.GetDeviceType()!=expectedDevice||source.GetDisplayMode()!=displayMode)return false;
+ cp.SetRamSize(source.GetRamSize()).SetDisplayMode(displayMode).SetNand(source.GetNandSize(),const_cast<void*>(source.GetNand()));
  cp.SetMemory(source.GetMemorySize(),copy(source.GetMemory(),source.GetMemorySize()));cp.SetSavestate(source.GetSavestateSize(),copy(source.GetSavestate(),source.GetSavestateSize()));
  if(!cp.Launch(source.GetNorSize(),const_cast<void*>(source.GetNor())))return false;
  cp.SetIrBridgeEnabled(true);cp.SetPcmOutputEnabled(false);return true;
 }
 bool RemoteBackend::Save(const std::string& path){
- cp.Save();SessionFile5 s;s.SetDeviceType(cp.GetDeviceType()).SetDisplayMode(5).SetRamSize(cp.GetRamSize());
+ cp.Save();SessionFile5 s;s.SetDeviceType(cp.GetDeviceType()).SetDisplayMode(cp.GetDeviceType()==2?6:5).SetRamSize(cp.GetRamSize());
  s.SetNor(cp.GetRomDataSize(),cp.GetRomData());s.SetNand(cp.GetNandDataSize(),cp.GetNandData());s.SetMemory(cp.GetMemoryDataSize(),cp.GetMemoryData());s.SetSavestate(cp.GetSavestateSize(),cp.GetSavestateData());
  return s.Serialize()&&write(path,s.GetSerializedSession(),s.GetSerializedSessionSize());
 }

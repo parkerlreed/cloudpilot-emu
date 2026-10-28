@@ -17,7 +17,8 @@ FILES = [
 ]
 
 
-def prepare(archive, destination, e2=False):
+def prepare(archive, destination, e2=False, pv=False):
+    e2 = e2 or pv
     with zipfile.ZipFile(archive) as source:
         app = bytearray(source.read(FILES[0]))
         if hashlib.sha256(app).hexdigest() != EXPECTED_SHA256:
@@ -47,6 +48,16 @@ def prepare(archive, destination, e2=False):
                 kind, resource_id, offset = struct.unpack_from('>4sHI', app, 78 + 10*i)
                 if kind == b'ARMC':
                     app[offset:offset + 4] = b'NRIR'
+        if pv:
+            # rePalm is absent from Novii's 2008 IR device table. Select the
+            # E2 IR driver (26), whose hardware calls use our USB bridge.
+            # Keep actual OEM IDs and display detection everywhere else.
+            patches.append((0x140dc, '4e56fff02f03', '701a4e754e71'))
+            # rePalm has no physical IR serial port to reserve. Use Novii's
+            # existing unowned-port sentinel, which also skips serial cleanup.
+            # ARM IR operations still go through the signature-checked bridge.
+            patches.append((0x1564c, '4e56fffc2f0a2f03246e00084a6a',
+                            '206f0004317cffff000470014e75'))
         for offset, original, replacement in patches:
             expected, stub = bytes.fromhex(original), bytes.fromhex(replacement)
             if app[offset:offset + len(expected)] != expected:
@@ -67,6 +78,8 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     e2 = '--e2' in args
     if e2: args.remove('--e2')
+    pv = '--pv' in args
+    if pv: args.remove('--pv')
     if len(args) != 2:
-        sys.exit('Usage: prepare-novii.py [--e2] NOVII_ZIP OUTPUT_DIRECTORY')
-    prepare(*args, e2=e2)
+        sys.exit('Usage: prepare-novii.py [--e2|--pv] NOVII_ZIP OUTPUT_DIRECTORY')
+    prepare(*args, e2=e2, pv=pv)

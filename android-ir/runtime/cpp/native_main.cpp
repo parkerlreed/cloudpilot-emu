@@ -16,8 +16,15 @@
 namespace {
 #ifdef OMNI_REMOTE
 constexpr const char* AppLogTag="OmniRemote";
+#elif defined(NOVII_PV)
+constexpr const char* AppLogTag="NoviiRemotePV";
 #else
 constexpr const char* AppLogTag="NoviiRemote";
+#endif
+#ifdef NOVII_PV
+constexpr int LcdHeight=480, ButtonsY=480, LogicalHeight=540;
+#else
+constexpr int LcdHeight=320, ButtonsY=442, LogicalHeight=502;
 #endif
 std::atomic<bool> saveRequested{false},exitRequested{false};
 std::mutex captureMutex;
@@ -55,10 +62,10 @@ extern "C" int SDL_main(int argc,char** argv){
  const std::string sessionPath=argc>1?argv[1]:"session-e2.img";
  SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE,"0");SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS,"0");SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,"0");
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_EVENTS)!=0){message(SDL_GetError());return 1;}
- SDL_Window* window=SDL_CreateWindow("Palm IR Remote",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,320,502,SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI|SDL_WINDOW_FULLSCREEN_DESKTOP);
+ SDL_Window* window=SDL_CreateWindow("Palm IR Remote",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,320,LogicalHeight,SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI|SDL_WINDOW_FULLSCREEN_DESKTOP);
  SDL_Renderer* renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);if(!renderer)renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
- if(!window||!renderer){message(SDL_GetError());SDL_Quit();return 1;}SDL_RenderSetLogicalSize(renderer,320,502);
- SDL_Texture* lcd=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ABGR8888,SDL_TEXTUREACCESS_STREAMING,RemoteBackend::Width,RemoteBackend::Width),*graffiti=skin(renderer,"graffiti.bmp"),*buttons=skin(renderer,"buttons.bmp");
+ if(!window||!renderer){message(SDL_GetError());SDL_Quit();return 1;}SDL_RenderSetLogicalSize(renderer,320,LogicalHeight);
+ SDL_Texture* lcd=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ABGR8888,SDL_TEXTUREACCESS_STREAMING,RemoteBackend::Width,RemoteBackend::Height),*graffiti=skin(renderer,"graffiti.bmp"),*buttons=skin(renderer,"buttons.bmp");
  if(!emulator){
   auto data=readFile(sessionPath);if(data.empty())data=readAsset("session.img");
   emulator=new RemoteBackend();
@@ -76,15 +83,21 @@ extern "C" int SDL_main(int argc,char** argv){
  bool running=true,background=false,learningRequested=false,pen=false,haveFrame=false,fingerActive=false;unsigned pressed=0;SDL_FingerID finger=0;
  if(!lastFrame.empty()){SDL_UpdateTexture(lcd,nullptr,lastFrame.data(),RemoteBackend::Width*4);haveFrame=true;}
  auto release=[&](){if(pen){cp.PenUp();pen=false;}if(pressed){cp.KeyUp(pressed);pressed=0;}};
- auto move=[&](float x,float y){cp.PenDown(SDL_clamp(int(x),0,319),SDL_clamp(int(y>=320?SDL_max(320,y-2):y),0,439));};
- auto down=[&](float x,float y){if(cp.IsIrLearnPending()||x<0||x>=320||y<0||y>=502)return;if(y>=442){pressed=hardware(x,y-442);cp.KeyDown(pressed);}else{pen=true;move(x,y);}};
+ auto move=[&](float x,float y){
+#ifdef NOVII_PV
+  cp.PenDown(SDL_clamp(int(x),0,319),SDL_clamp(int(y),0,LcdHeight-1));
+#else
+  cp.PenDown(SDL_clamp(int(x),0,319),SDL_clamp(int(y>=320?SDL_max(320,y-2):y),0,439));
+#endif
+ };
+ auto down=[&](float x,float y){if(cp.IsIrLearnPending()||x<0||x>=320||y<0||y>=LogicalHeight)return;if(y>=ButtonsY){pressed=hardware(x,y-ButtonsY);cp.KeyDown(pressed);}else{pen=true;move(x,y);}};
  while(running){
   SDL_Event e;while(SDL_PollEvent(&e))switch(e.type){
    case SDL_QUIT:exitRequested=true;saveRequested=true;break;
    case SDL_APP_WILLENTERBACKGROUND:background=true;saveRequested=true;release();cp.SetAudioEnabled(false);if(audioDevice){SDL_ClearQueuedAudio(audioDevice);SDL_PauseAudioDevice(audioDevice,1);}break;
    case SDL_APP_DIDENTERFOREGROUND:background=false;cp.SetAudioEnabled(audioDevice!=0);if(audioDevice)SDL_PauseAudioDevice(audioDevice,0);break;
-   case SDL_FINGERDOWN:if(!fingerActive){fingerActive=true;finger=e.tfinger.fingerId;down(e.tfinger.x*320,e.tfinger.y*502);}break;
-   case SDL_FINGERMOTION:if(fingerActive&&e.tfinger.fingerId==finger&&pen&&!cp.IsIrLearnPending())move(e.tfinger.x*320,e.tfinger.y*502);break;
+   case SDL_FINGERDOWN:if(!fingerActive){fingerActive=true;finger=e.tfinger.fingerId;down(e.tfinger.x*320,e.tfinger.y*LogicalHeight);}break;
+   case SDL_FINGERMOTION:if(fingerActive&&e.tfinger.fingerId==finger&&pen&&!cp.IsIrLearnPending())move(e.tfinger.x*320,e.tfinger.y*LogicalHeight);break;
    case SDL_FINGERUP:if(fingerActive&&e.tfinger.fingerId==finger){release();fingerActive=false;}break;
    case SDL_MOUSEBUTTONDOWN:if(e.button.which!=SDL_TOUCH_MOUSEID&&e.button.button==SDL_BUTTON_LEFT)down(e.button.x,e.button.y);break;
    case SDL_MOUSEMOTION:if(pen&&e.motion.which!=SDL_TOUCH_MOUSEID&&!cp.IsIrLearnPending())move(e.motion.x,e.motion.y);break;
@@ -109,9 +122,9 @@ extern "C" int SDL_main(int argc,char** argv){
   if(cp.IsIrLearnPending()&&!learningRequested){learningRequested=true;jni->CallVoidMethod(activity,learnMethod);}
   while(cp.GetIrTransmitSize()){unsigned n=cp.GetIrTransmitSize();jintArray p=jni->NewIntArray(n);jni->SetIntArrayRegion(p,0,n,static_cast<const jint*>(cp.GetIrTransmitData()));jni->CallVoidMethod(activity,transmitMethod,cp.GetIrTransmitFrequency(),p);jni->DeleteLocalRef(p);cp.PopIrTransmit();}
   if(background){SDL_Delay(20);continue;}
-  if(void* frame=cp.GetFrame()){lastFrame.assign(static_cast<uint8_t*>(frame),static_cast<uint8_t*>(frame)+RemoteBackend::Width*RemoteBackend::Width*4);SDL_UpdateTexture(lcd,nullptr,frame,RemoteBackend::Width*4);cp.ResetFrame();haveFrame=true;}
-  SDL_SetRenderDrawColor(renderer,24,32,42,255);SDL_RenderClear(renderer);SDL_Rect lr{0,0,320,320},gr{0,322,320,120},br{0,442,320,60};
-  if(haveFrame)SDL_RenderCopy(renderer,lcd,nullptr,&lr);if(graffiti)SDL_RenderCopy(renderer,graffiti,nullptr,&gr);if(buttons)SDL_RenderCopy(renderer,buttons,nullptr,&br);SDL_RenderPresent(renderer);
+  if(void* frame=cp.GetFrame()){lastFrame.assign(static_cast<uint8_t*>(frame),static_cast<uint8_t*>(frame)+RemoteBackend::Width*RemoteBackend::Height*4);SDL_UpdateTexture(lcd,nullptr,frame,RemoteBackend::Width*4);cp.ResetFrame();haveFrame=true;}
+  SDL_SetRenderDrawColor(renderer,24,32,42,255);SDL_RenderClear(renderer);SDL_Rect lr{0,0,320,LcdHeight},gr{0,322,320,120},br{0,ButtonsY,320,60};
+  if(haveFrame)SDL_RenderCopy(renderer,lcd,nullptr,&lr);if(graffiti&&LcdHeight==320)SDL_RenderCopy(renderer,graffiti,nullptr,&gr);if(buttons)SDL_RenderCopy(renderer,buttons,nullptr,&br);SDL_RenderPresent(renderer);
  }
  cp.SetAudioEnabled(false);if(audioDevice)SDL_CloseAudioDevice(audioDevice);
  SDL_DestroyTexture(buttons);SDL_DestroyTexture(graffiti);SDL_DestroyTexture(lcd);SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();jni->DeleteLocalRef(activity);activity=nullptr;return 0;

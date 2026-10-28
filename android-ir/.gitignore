@@ -3,5 +3,8 @@ build/
 **/build/
 **/.cxx/
 local.properties
+signing/
+release-signing.properties
 omniremote/src/main/assets/session.img
 noviiremote/src/main/assets/session.img
+noviiremote-pv/src/main/assets/session.img

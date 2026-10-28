@@ -1,0 +1,5 @@
+# Copy to release-signing.properties. Keep the keystore and password files private.
+storeFile=signing/novii-pv-release.jks
+storePasswordFile=signing/novii-pv.password
+keyAlias=novii-pv
+keyPasswordFile=signing/novii-pv.password

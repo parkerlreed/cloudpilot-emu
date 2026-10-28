@@ -1,19 +1,20 @@
 # Native Palm USB IR remotes (Android / SDL2)
 
-Two standalone ARM64 Android apps run Cloudpilot directly as native C++ with
-SDL2 rendering, touch, Graffiti and hardware buttons. Both use the native
+Standalone ARM64 Android apps run Cloudpilot directly as native C++ with
+SDL2 rendering, touch, Graffiti and hardware buttons. They use the native
 Android USB receiver/transmitter. No WebView or WASM runtime is packaged.
 
 | Application module | Android package | Palm backend | Saved file |
 | --- | --- | --- | --- |
 | `omniremote` | `local.omniremote.irtest` | m130 / OS 4 / 68k | `session.img` |
 | `noviiremote` | `local.noviiremote.irtest` | Tungsten E2 / OS 5 / ARM | `session-e2.img` |
+| `noviiremote-pv` | `local.noviiremote.pv.irtest` | rePalm paravirtualized / OS 5 / ARM | `session-pv-ir.img` |
 
 These are independent Android application modules, with their own manifests,
 launcher activities, package IDs and assets. Shared SDL/USB code is in the
-neutral `runtime/` directory and Java package `local.palmir`; neither app is a
-build variant of the other. Log tags are `OmniRemote` and `NoviiRemote`, with
-shared USB protocol diagnostics under `PalmUsbIR`.
+neutral `runtime/` directory and Java package `local.palmir`. Log tags are
+`OmniRemote`, `NoviiRemote` and `NoviiRemotePV`, with shared USB protocol
+diagnostics under `PalmUsbIR`.
 
 OmniRemote retains its existing package ID and saved session. Novii formerly
 used `local.omniremote.irtest.novii`; an existing installation of that legacy
@@ -64,6 +65,29 @@ adb install -r noviiremote/build/outputs/apk/debug/noviiremote-debug.apk
 adb shell am start -n local.noviiremote.irtest/local.noviiremote.NoviiRemoteActivity
 ```
 
+The experimental **NoviiRemote PV** app uses `uarm-pv-09282026.bin.gz`
+(or its uncompressed ROM) with the core's existing paravirtualized machine,
+32 MB RAM and a 320×480 display. It has a separate package and saved session,
+so it can be installed alongside the E2 app for comparison. It shares the
+Novii IR bridge, original icon, sound and USB support. rePalm renders its own
+Graffiti/input area within the LCD, with the SDL hardware buttons below it.
+The full 480-pixel display is needed to show Novii's Start and Help controls;
+a 320-pixel viewport crops them out.
+
+```sh
+JAVA_HOME=/path/to/jdk21 EMSDK=/path/to/emsdk \
+  PV_ROM=/path/to/uarm-pv-09282026.bin.gz \
+  NOVII_ZIP=/path/to/NoviiRemote.zip ./build.sh
+adb install -r noviiremote-pv/build/outputs/apk/debug/noviiremote-pv-debug.apk
+adb shell am start -n local.noviiremote.pv.irtest/local.noviiremote.pv.NoviiRemotePvActivity
+```
+
+First-time preparation uses the host WASM core (reusing it if already built),
+completes this ROM's digitizer setup and installs the PV-adapted Novii PRC
+and supplied profiles. No E2 NOR or NAND image is needed. A prepared session can instead
+be supplied with `PV_SESSION=/path/to/session.img ./build.sh`, requiring no
+host WASM tools. The emulator inside the APK is native C++/SDL2.
+
 Native APK builds from prepared sessions do not require Emscripten, Node or
 Yarn. For first-time Novii installation from NOR/NAND and the supplied zip,
 the optional host preparation helper uses Emscripten 4.0.18 and Node:
@@ -80,6 +104,25 @@ the initial session. It is excluded from the APK. Original NOR/NAND files are
 read without modification. Palm software, generated sessions, SDK locations,
 WASM, APKs and build caches are excluded from Git. Keep ROM-containing APKs local.
 
+## PV release signing
+
+The PV release APK uses a persistent release key, separate from Android's
+debug key. Copy `release-signing.properties.example` to
+`release-signing.properties` and provide the indicated keystore and password
+files. The local `signing/` directory and signing properties are ignored by Git.
+Keep a private backup of those files: future APK updates must use the same key.
+Release builds fail if signing configuration is absent.
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew :noviiremote-pv:assembleRelease
+```
+
+The artifact is `noviiremote-pv/build/outputs/apk/release/noviiremote-pv-release.apk`.
+Only this module is included in the PV GitHub release. Its Android package is
+`local.noviiremote.pv.irtest`, version 1.0.0 (version code 2). Switching from the
+debug-signed test app requires uninstalling that app first because the signing
+certificates differ; uninstalling removes its private Palm session.
+
 ## IR behavior
 
 In OmniRemote choose **Internal IR**, then **Training → Train buttons**.
@@ -95,6 +138,13 @@ English Deluxe 3.73D build 20080411b PRC SHA-256 before adapting its seven ARM
 IR calls. Signature-guarded private traps replace the device hardware loops;
 loaded carrier data stays in guest RAM and survives session restore.
 
+PV preparation additionally selects Novii's E2 IR driver and bypasses its
+physical serial-port reservation, since rePalm has no Palm IR port. The
+existing unowned-port sentinel also skips guest serial cleanup. These two
+signature-checked PRC patches apply only with `prepare-novii.py --pv`; the E2
+and m130 preparations retain their device checks. The original ROM and PRC
+archive remain unchanged.
+
 The dongle supplies envelope durations, not measured carrier. Novii learning
 assumes about 38 kHz (38,462 Hz after its integer period representation).
 For OmniRemote, set the intended carrier in Training Settings. Built-in Novii
@@ -104,8 +154,8 @@ share one USB worker. Other IR apps must release the dongle before use.
 
 ## Validation
 
-Native ARM64 APK builds cover both backends. On-device checks verified SDL2
-startup and rendering and Novii USB sends. The E2 core integration test accepts
+Native ARM64 APK builds cover m130, E2 and PV. On-device testing confirmed
+PV rendering, USB transmit and learning. The E2 core integration test accepts
 a real phone NEC capture, saves it through Novii and replays all 68 durations
 exactly at 38,462 Hz, including capture cancellation:
 
@@ -114,10 +164,20 @@ node test/novii-e2-roundtrip.cjs /path/to/cloudpilot-emu \
   /path/to/prepared-novii-welcome-session.img /path/to/capture.json
 ```
 
-The optional integration test uses the host WASM module and your local Palm
-software; the JSON capture contains a `pattern_us` array. The older m130 Novii
-adapter and its test remain available as development tools, but the Novii APK
-uses the E2 backend. No binary Palm software is committed.
+The PV regression follows the same transmit/learn/replay/cancel sequence,
+using the taller welcome screen and the same 320-pixel Setup dialog:
+
+```sh
+node test/novii-pv-roundtrip.cjs /path/to/cloudpilot-emu \
+  /path/to/prepared-pv-welcome-session.img /path/to/capture.json
+```
+
+Both tests use a local session created by the preparation helper, starting at
+Novii's welcome screen, and run without contacting the phone. The optional
+integration tests use the host WASM module and your local Palm software; the
+JSON capture contains a `pattern_us` array. The older m130 Novii adapter and its test remain available as development tools, but the Novii APK
+uses the E2 backend by default; the separate PV app uses rePalm. No binary
+Palm software is committed.
 
 The short-click PWM regression test runs without a ROM or Android device:
 

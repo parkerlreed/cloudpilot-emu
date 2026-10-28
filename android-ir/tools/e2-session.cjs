@@ -10,13 +10,20 @@ async function openE2(core, options) {
     if (options.image) {
         const data = fs.readFileSync(options.image), p = put(data), image = new M.SessionFile5();
         if (!image.Deserialize(data.length, p)) throw Error('Invalid E2 session');
-        cp.SetRamSize(image.GetRamSize()); cp.SetDisplayMode(5);
+        cp.SetRamSize(image.GetRamSize()); cp.SetDisplayMode(image.GetDisplayMode());
         const nor = clone(image.GetNor(), image.GetNorSize());
         cp.SetNand(image.GetNandSize(), clone(image.GetNand(), image.GetNandSize()));
         cp.SetMemory(image.GetMemorySize(), clone(image.GetMemory(), image.GetMemorySize()));
         cp.SetSavestate(image.GetSavestateSize(), clone(image.GetSavestate(), image.GetSavestateSize()));
         if (!cp.Launch(image.GetNorSize(), nor)) throw Error('E2 restore failed');
         M.destroy(image); bridge.Free(p);
+    } else if (options.pvRom) {
+        const zlib = require('node:zlib');
+        const input = fs.readFileSync(options.pvRom);
+        const rom = input[0] === 0x1f && input[1] === 0x8b ? zlib.gunzipSync(input) : input;
+        cp.SetDisplayMode(6); // rePalm uses a 320x480 display with built-in DIA.
+        if (!cp.Launch(rom.length, put(rom)) || cp.GetDeviceType() !== 2)
+            throw Error('Expected a rePalm paravirtualized ROM');
     } else {
         const nor = fs.readFileSync(options.nor), nand = fs.readFileSync(options.nand);
         cp.SetNand(nand.length, put(nand));
@@ -33,7 +40,7 @@ async function openE2(core, options) {
     const save = destination => {
         if (cp.IsIrLearnPending()) throw Error('Finish or cancel learning before saving');
         cp.Save(); const image = new M.SessionFile5();
-        image.SetDeviceType(cp.GetDeviceType()); image.SetDisplayMode(5); image.SetRamSize(cp.GetRamSize());
+        image.SetDeviceType(cp.GetDeviceType()); image.SetDisplayMode(cp.GetDeviceType() === 2 ? 6 : 5); image.SetRamSize(cp.GetRamSize());
         image.SetNor(cp.GetRomDataSize(), cp.GetRomData()); image.SetNand(cp.GetNandDataSize(), cp.GetNandData());
         image.SetMemory(cp.GetMemoryDataSize(), cp.GetMemoryData()); image.SetSavestate(cp.GetSavestateSize(), cp.GetSavestateData());
         if (!image.Serialize()) throw Error('Could not serialize E2 session');
