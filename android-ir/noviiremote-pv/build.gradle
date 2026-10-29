@@ -9,7 +9,7 @@ def signingFile = rootProject.file('release-signing.properties')
 def releaseSigning = new Properties()
 if (signingFile.exists()) signingFile.withInputStream { releaseSigning.load(it) }
 android {
-    defaultConfig { versionCode 2; versionName '1.0.0' }
+    defaultConfig { versionCode 3; versionName '1.0.1' }
     if (signingFile.exists()) {
         signingConfigs {
             pvRelease {

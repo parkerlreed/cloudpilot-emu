@@ -119,7 +119,7 @@ JAVA_HOME=/path/to/jdk21 ./gradlew :noviiremote-pv:assembleRelease
 
 The artifact is `noviiremote-pv/build/outputs/apk/release/noviiremote-pv-release.apk`.
 Only this module is included in the PV GitHub release. Its Android package is
-`local.noviiremote.pv.irtest`, version 1.0.0 (version code 2). Switching from the
+`local.noviiremote.pv.irtest`, version 1.0.1 (version code 3). Switching from the
 debug-signed test app requires uninstalling that app first because the signing
 certificates differ; uninstalling removes its private Palm session.
 
