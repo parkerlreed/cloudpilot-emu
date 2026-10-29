@@ -8,13 +8,20 @@
 #include "EmCPU68K.h"
 #endif
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
 #include <cstdlib>
-#include <fstream>
+#include <cstdio>
+#include <fcntl.h>
+#include <unistd.h>
 namespace {
+ // Replace the session atomically, and only after its bytes are durable.
  bool write(const std::string& path,const void* bytes,size_t size){
-  std::string temp=path+".tmp";std::ofstream f(temp,std::ios::binary|std::ios::trunc);
-  f.write(static_cast<const char*>(bytes),size);f.close();return f&&std::rename(temp.c_str(),path.c_str())==0;
+  const std::string temp=path+".tmp";const int fd=open(temp.c_str(),O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC,0600);if(fd<0)return false;
+  const char* p=static_cast<const char*>(bytes);bool ok=true;
+  while(size&&ok){const ssize_t n=::write(fd,p,size);if(n>0){p+=n;size-=n;}else ok=n<0&&errno==EINTR;}
+  ok=fsync(fd)==0&&ok;ok=close(fd)==0&&ok;
+  return ok&&std::rename(temp.c_str(),path.c_str())==0;
  }
  void* copy(const void* data,size_t n){void* p=malloc(n);if(p)memcpy(p,data,n);return p;}
 }

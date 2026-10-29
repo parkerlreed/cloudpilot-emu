@@ -21,6 +21,9 @@ public abstract class NativeActivity extends SDLActivity {
     private int[] pendingTransmit;
     private int pendingFrequency;
     private boolean closing=false;
+    // Saves finished by the SDL thread, and the count when the last pause requested one.
+    private final Object saveSignal=new Object();
+    private int savesFinished, savesAtPause=-1;
     private String permissionAction;
     private native void captureComplete(int[] timings,String error);
     private native void requestSave(boolean exit);
@@ -58,7 +61,21 @@ public abstract class NativeActivity extends SDLActivity {
     @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);if(focus)hideStatusBar();}
     private void saveAndExit(){if(closing)return;closing=true;cancelled.set(true);requestSave(true);}
     @Override public void onBackPressed(){saveAndExit();}
-    @Override protected void onPause(){if(!closing)requestSave(false);super.onPause();}
+    @Override protected void onPause(){if(!closing){synchronized(saveSignal){savesAtPause=savesFinished;}requestSave(false);}super.onPause();}
+    // Recents "Close all" kills the process soon after the activity stops. Hold the stop until
+    // the pause save has reached disk, or the next launch restores an older session.
+    @Override protected void onStop(){waitForPauseSave();super.onStop();}
+    private void waitForPauseSave(){
+        final long deadline=SystemClock.uptimeMillis()+2000;
+        synchronized(saveSignal){
+            while(savesAtPause>=0&&savesFinished<=savesAtPause){
+                long left=deadline-SystemClock.uptimeMillis();
+                if(left<=0){Log.w(logTag(),"Palm session save still pending at stop");break;}
+                try{saveSignal.wait(left);}catch(InterruptedException e){Thread.currentThread().interrupt();break;}
+            }
+            savesAtPause=-1;
+        }
+    }
     // Called by the SDL thread, always marshalled to Android's UI thread.
     public void learn(){runOnUiThread(()->{
         if(!busy.compareAndSet(false,true)){complete(null,"USB operation already in progress");return;}
@@ -87,6 +104,6 @@ public abstract class NativeActivity extends SDLActivity {
         finally{busy.set(false);}
     });}
     public void showMessage(String text){runOnUiThread(()->Toast.makeText(this,text,Toast.LENGTH_SHORT).show());}
-    public void saved(boolean exit,boolean success){runOnUiThread(()->{if(success){Log.i(logTag(),"Palm session saved");if(exit)finish();}else{closing=false;showMessage("Could not save Palm state. Press Back to retry.");}});}
+    public void saved(boolean exit,boolean success){synchronized(saveSignal){savesFinished++;saveSignal.notifyAll();}runOnUiThread(()->{if(success){Log.i(logTag(),"Palm session saved");if(exit)finish();}else{closing=false;showMessage("Could not save Palm state. Press Back to retry.");}});}
     @Override protected void onDestroy(){cancelled.set(true);unregisterReceiver(permissions);worker.shutdown();super.onDestroy();}
 }
